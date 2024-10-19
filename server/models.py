@@ -1,65 +1,69 @@
-# server/models.py
+
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
 from sqlalchemy_serializer import SerializerMixin
-from sqlalchemy.ext.associationproxy import association_proxy
 
-metadata = MetaData(
-    naming_convention={
-        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    }
-)
+metadata = MetaData(naming_convention={
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+})
 
 db = SQLAlchemy(metadata=metadata)
 
+class Bakery(db.Model, SerializerMixin):
+    __tablename__ = 'bakeries'
 
-class Game(db.Model):
-    __tablename__ = "games"
+    serialize_rules = ('-baked_goods.bakery',)
 
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String, unique=True)
-    genre = db.Column(db.String)
-    platform = db.Column(db.String)
-    price = db.Column(db.Integer)
+    name = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, onupdate=db.func.now())
 
-    reviews = db.relationship("Review", back_populates="game")
+    baked_goods = db.relationship('BakedGood', backref='bakery', lazy=True)
 
     def __repr__(self):
-        return f"<Game {self.title} for {self.platform}>"
+        return f'<Bakery {self.name}>'
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+        }
 
-class Review(db.Model):
-    __tablename__ = "reviews"
+    def to_dict_with_baked_goods(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'baked_goods': [baked_good.to_dict() for baked_good in self.baked_goods]
+        }
+
+class BakedGood(db.Model, SerializerMixin):
+    __tablename__ = 'baked_goods'
+
+    serialize_rules = ('-bakery.baked_goods',)
 
     id = db.Column(db.Integer, primary_key=True)
-    score = db.Column(db.Integer)
-    comment = db.Column(db.String)
+    name = db.Column(db.String, nullable=False)
+    price = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, onupdate=db.func.now())
 
-    game_id = db.Column(db.Integer, db.ForeignKey("games.id"))
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-
-    game = db.relationship("Game", back_populates="reviews")
-    user = db.relationship("User", back_populates="reviews")
+    bakery_id = db.Column(db.Integer, db.ForeignKey('bakeries.id'))
 
     def __repr__(self):
-        return f"<Review ({self.id}) of {self.game}: {self.score}/10>"
+        return f'<Baked Good {self.name}, ${self.price}>'
 
-
-class User(db.Model):
-    __tablename__ = "users"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(db.DateTime, onupdate=db.func.now())
-
-    reviews = db.relationship("Review", back_populates="user")
-
-    def __repr__(self):
-        return f"<User ({self.id}) {self.name}>"
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'price': self.price,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'bakery_id': self.bakery_id
+        }
